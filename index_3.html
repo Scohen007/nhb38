@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch Card</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .image {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            cursor: pointer;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        /* Popup styles */
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            animation: popup-animation 0.5s ease-out;
+        }
+        
+        @keyframes popup-animation {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            80% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div class="container">
+            <!-- Replace the src attribute with your local image path when using locally -->
+            <div class="image">
+                <img src="img_4.jpg" alt="Surprise Image">
+            </div>
+            <canvas id="scratchCanvas" width="300" height="200"></canvas>
+        </div>
+        <div class="instructions">
+            <p>גרדי את האזור האפור</p>
+            <button id="reset">התחילי מחדש</button>
+        </div>
+        
+        <!-- Success popup -->
+        <div id="successPopup" class="popup">הגיע הזמן להתנדנד </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('scratchCanvas');
+            const ctx = canvas.getContext('2d');
+            const successPopup = document.getElementById('successPopup');
+            let successShown = false;
+            let scratchedPixels = 0;
+            const totalPixels = canvas.width * canvas.height;
+            const scratchThreshold = 90; // Show popup when 90% is scratched - requires almost all area to be scratched
+            
+            // Create a grid to track scratched areas more precisely
+            const gridSize = 10; // 10x10 pixel cells
+            const gridWidth = Math.ceil(canvas.width / gridSize);
+            const gridHeight = Math.ceil(canvas.height / gridSize);
+            let scratchGrid = new Array(gridWidth * gridHeight).fill(false);
+            
+            // Ensure canvas is initialized properly
+            function initCanvas() {
+                // Fill the canvas with gray color
+                ctx.fillStyle = '#888';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Add text to the overlay
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('יאללה גרדי', canvas.width / 2, canvas.height / 2);
+                
+                // Reset scratch tracking
+                scratchedPixels = 0;
+                successShown = false;
+                scratchGrid = new Array(gridWidth * gridHeight).fill(false);
+            }
+            
+            // Initialize canvas
+            initCanvas();
+            
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            
+            function getCoordinates(e) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+            
+            function startDrawing(e) {
+                isDrawing = true;
+                const coords = getCoordinates(e);
+                lastX = coords.x;
+                lastY = coords.y;
+                draw(e);
+            }
+            
+            function stopDrawing() {
+                isDrawing = false;
+                checkScratchCompletion();
+            }
+            
+            function markGridCellsInRadius(centerX, centerY, radius) {
+                const startGridX = Math.max(0, Math.floor((centerX - radius) / gridSize));
+                const endGridX = Math.min(gridWidth - 1, Math.floor((centerX + radius) / gridSize));
+                const startGridY = Math.max(0, Math.floor((centerY - radius) / gridSize));
+                const endGridY = Math.min(gridHeight - 1, Math.floor((centerY + radius) / gridSize));
+                
+                let newlyScratchedCells = 0;
+                
+                for (let gx = startGridX; gx <= endGridX; gx++) {
+                    for (let gy = startGridY; gy <= endGridY; gy++) {
+                        const index = gy * gridWidth + gx;
+                        
+                        // If this cell wasn't already scratched
+                        if (!scratchGrid[index]) {
+                            // Mark as scratched
+                            scratchGrid[index] = true;
+                            newlyScratchedCells++;
+                        }
+                    }
+                }
+                
+                return newlyScratchedCells;
+            }
+            
+            function markGridCellsInLine(x1, y1, x2, y2, width) {
+                // Calculate direction vector
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // If the points are the same, just mark one circle
+                if (distance < 1) {
+                    return markGridCellsInRadius(x1, y1, width / 2);
+                }
+                
+                // Mark points along the line
+                const steps = Math.ceil(distance / (width / 4)); // Use width/4 for dense sampling
+                let newlyScratchedCells = 0;
+                
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const x = x1 + dx * t;
+                    const y = y1 + dy * t;
+                    newlyScratchedCells += markGridCellsInRadius(x, y, width / 2);
+                }
+                
+                return newlyScratchedCells;
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                e.preventDefault();
+                const coords = getCoordinates(e);
+                
+                // Perform the actual drawing
+                const lineWidth = 30;
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = lineWidth;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+                
+                // Also add a circle at the current position for better scratching effect
+                const radius = 15;
+                ctx.beginPath();
+                ctx.arc(coords.x, coords.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Track scratched areas in our grid
+                const newlyScratchedCells = markGridCellsInLine(lastX, lastY, coords.x, coords.y, lineWidth);
+                const totalGridCells = gridWidth * gridHeight;
+                const scratchedCells = scratchGrid.filter(cell => cell).length;
+                const scratchedPercentage = (scratchedCells / totalGridCells) * 100;
+                
+                // Check if we've reached the threshold
+                if (scratchedPercentage > scratchThreshold && !successShown) {
+                    showSuccessPopup();
+                }
+                
+                lastX = coords.x;
+                lastY = coords.y;
+            }
+            
+            function checkScratchCompletion() {
+                if (successShown) return;
+                
+                const scratchedCells = scratchGrid.filter(cell => cell).length;
+                const totalGridCells = gridWidth * gridHeight;
+                const scratchedPercentage = (scratchedCells / totalGridCells) * 100;
+                
+                console.log("Scratched percentage:", scratchedPercentage.toFixed(2) + "%");
+                
+                if (scratchedPercentage > scratchThreshold) {
+                    showSuccessPopup();
+                }
+            }
+            
+            function showSuccessPopup() {
+                successShown = true;
+                successPopup.style.display = 'block';
+                
+                // Debug logging
+                console.log("Success popup shown!");
+                
+                // Hide popup after 3 seconds
+                setTimeout(() => {
+                    successPopup.style.display = 'none';
+                }, 30000);
+            }
+            
+            // Mouse events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            // Touch events
+            canvas.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                startDrawing(e);
+            });
+            
+            canvas.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                draw(e);
+            });
+            
+            canvas.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                stopDrawing();
+            });
+            
+            // Reset button
+            document.getElementById('reset').addEventListener('click', function() {
+                ctx.globalCompositeOperation = 'source-over';
+                initCanvas();
+                successPopup.style.display = 'none';
+            });
+        });
+    </script>
+</body>
+</html>

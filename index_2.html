@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3x3 Sliding Puzzle</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+    }
+    .container {
+      text-align: center;
+    }
+    .puzzle {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(2, 100px);
+      gap: 5px;
+      margin: 20px auto;
+      border: 2px solid #333;
+      width: 310px;
+      height: 205px;
+    }
+    .tile {
+      width: 100px;
+      height: 100px;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: transform 0.2s;
+      background-position: center;
+      background-size: 300px 200px; /* Updated for 3x2 grid */
+    }
+    .tile:hover {
+      transform: scale(0.95);
+    }
+    .empty {
+      background-color: transparent;
+      border: 2px dashed #aaa;
+      cursor: default;
+      background-image: none !important;
+    }
+    .empty:hover {
+      transform: none;
+    }
+    .success-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .success-content {
+      background-color: white;
+      padding: 30px 50px;
+      border-radius: 10px;
+      text-align: center;
+      animation: pop 0.3s;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .success-content h2 {
+      margin-top: 0;
+      color: #27ae60;
+    }
+    button {
+      background-color: #2ecc71;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #27ae60;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תשלימי יא מושלמת</h1>
+    <div class="puzzle" id="puzzle">
+      <!-- Tiles will be added dynamically -->
+    </div>
+    <button onclick="shufflePuzzle()">עירבוב מחדש </button>
+  </div>
+
+  <div class="success-modal" id="successModal">
+    <div class="success-content">
+      <h2>יפה אשתי</h2>
+      <p>חיפוש האני הפנימי יכול לקרות רק מתוך רוגע</p>
+      <button onclick="closeModal()">שחקי שוב</button>
+    </div>
+  </div>
+
+  <script>
+    // Puzzle state (3x2 grid = 6 tiles)
+    let puzzleState = [1, 2, 3, 4, 5, null];
+    let emptyTileIndex = 5; // Initially the empty tile is in the bottom right
+    const puzzleElement = document.getElementById('puzzle');
+    const successModal = document.getElementById('successModal');
+    const imagePath = 'img_3.png'; // Path to your image
+
+    // Initialize the puzzle
+    function initPuzzle() {
+      puzzleElement.innerHTML = '';
+      puzzleState.forEach((value, index) => {
+        const tile = document.createElement('div');
+        tile.className = value === null ? 'tile empty' : 'tile';
+        
+        if (value !== null) {
+          // Calculate the background position for this tile
+          const row = Math.floor((value - 1) / 3); // 3 columns now
+          const col = (value - 1) % 3; // 3 columns now
+          const bgPosX = -col * 100; // Each tile is 100px wide
+          const bgPosY = -row * 100; // Each tile is 100px high
+          
+          tile.style.backgroundImage = `url('${imagePath}')`;
+          tile.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
+          tile.onclick = () => moveTile(index);
+        }
+        
+        puzzleElement.appendChild(tile);
+      });
+    }
+
+    // Shuffle the puzzle
+    function shufflePuzzle() {
+      // Make a lot of random moves to shuffle
+      for (let i = 0; i < 100; i++) {
+        const possibleMoves = getValidMoves();
+        const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+        swapTiles(randomMove, emptyTileIndex);
+        emptyTileIndex = randomMove;
+      }
+      initPuzzle();
+    }
+
+    // Get valid moves for the empty tile in a 3x2 grid
+    function getValidMoves() {
+      const moves = [];
+      // Check if empty tile can move up
+      if (emptyTileIndex >= 3) {
+        moves.push(emptyTileIndex - 3);
+      }
+      // Check if empty tile can move down
+      if (emptyTileIndex < 3) {
+        moves.push(emptyTileIndex + 3);
+      }
+      // Check if empty tile can move left (not on left edge)
+      if (emptyTileIndex % 3 !== 0) {
+        moves.push(emptyTileIndex - 1);
+      }
+      // Check if empty tile can move right (not on right edge)
+      if (emptyTileIndex % 3 !== 2) {
+        moves.push(emptyTileIndex + 1);
+      }
+      return moves;
+    }
+
+    // Handle tile click
+    function moveTile(tileIndex) {
+      // Check if the clicked tile is adjacent to the empty tile
+      if (isAdjacent(tileIndex, emptyTileIndex)) {
+        swapTiles(tileIndex, emptyTileIndex);
+        emptyTileIndex = tileIndex;
+        initPuzzle();
+        
+        // Check if puzzle is solved
+        if (isPuzzleSolved()) {
+          setTimeout(() => {
+            successModal.style.display = 'flex';
+          }, 300);
+        }
+      }
+    }
+
+    // Check if two tiles are adjacent in a 3x2 grid
+    function isAdjacent(index1, index2) {
+      // Check if tiles are in the same row
+      const sameRow = Math.floor(index1 / 3) === Math.floor(index2 / 3);
+      // Check if tiles are in the same column
+      const sameCol = index1 % 3 === index2 % 3;
+      
+      // Two tiles are adjacent if they're in the same row and columns differ by 1
+      // OR if they're in the same column and rows differ by 1
+      if (sameRow && Math.abs(index1 - index2) === 1) {
+        return true;
+      }
+      if (sameCol && Math.abs(index1 - index2) === 3) {
+        return true;
+      }
+      return false;
+    }
+
+    // Swap two tiles in the puzzle state
+    function swapTiles(index1, index2) {
+      const temp = puzzleState[index1];
+      puzzleState[index1] = puzzleState[index2];
+      puzzleState[index2] = temp;
+    }
+
+    // Check if puzzle is solved
+    function isPuzzleSolved() {
+      const solvedState = [1, 2, 3, 4, 5, null];
+      return puzzleState.every((value, index) => value === solvedState[index]);
+    }
+    
+    // Handle file upload errors gracefully
+    window.addEventListener('error', function(e) {
+      if (e.target.tagName.toLowerCase() === 'img' || 
+         (e.target.style && e.target.style.backgroundImage && 
+          e.target.style.backgroundImage.includes('img_3.png'))) {
+        // If image fails to load
+        console.log('Image failed to load, falling back to numbers');
+        document.querySelectorAll('.tile:not(.empty)').forEach((tile, index) => {
+          tile.style.backgroundImage = 'none';
+          tile.style.backgroundColor = '#3498db';
+          tile.textContent = index + 1;
+          tile.style.display = 'flex';
+          tile.style.justifyContent = 'center';
+          tile.style.alignItems = 'center';
+          tile.style.fontSize = '24px';
+          tile.style.fontWeight = 'bold';
+          tile.style.color = 'white';
+        });
+      }
+    }, true);
+
+    // Close success modal
+    function closeModal() {
+      successModal.style.display = 'none';
+      shufflePuzzle();
+    }
+
+    // Initialize the puzzle on load
+    window.onload = function() {
+      initPuzzle();
+      shufflePuzzle(); // Start with a shuffled puzzle
+    };
+  </script>
+</body>
+</html>

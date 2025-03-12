@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find the Differences Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .instructions {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        .game-container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .image-container {
+            position: relative;
+            width: 48%;
+        }
+        
+        .image-container img {
+            width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .image-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .difference-area {
+            position: absolute;
+            border: 2px solid transparent;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .difference-area:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .difference-area.found {
+            border-color: #00cc00;
+            background-color: rgba(0, 204, 0, 0.3);
+            pointer-events: none;
+        }
+        
+        .counter {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #333;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: #fff;
+            padding: 30px 50px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal h2 {
+            color: #2c9e4b;
+            margin-top: 0;
+        }
+        
+        .close-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        
+        .close-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>אשתי היפה, מצאי 3 הבדלים בתמונות</h1>
+    
+    <div class="counter">מצאת: <span id="found-count">0</span>/3</div>
+    
+    <div class="game-container">
+        <div class="image-container">
+            <img src="img_1.png" alt="Original image of person eating sushi" id="original-image">
+        </div>
+        <div class="image-container">
+            <div class="image-wrapper">
+                <img src="img_2.png" alt="Modified image with differences" id="modified-image">
+                
+                <!-- The three difference areas -->
+                <div class="difference-area" id="diff1" onclick="markAsFound(this)"></div>
+                <div class="difference-area" id="diff2" onclick="markAsFound(this)"></div>
+                <div class="difference-area" id="diff3" onclick="markAsFound(this)"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Completion Modal -->
+    <div id="completion-modal" class="modal">
+        <div class="modal-content">
+            <h2>יפה</h2>
+            <p>משפט סיני קדום אומר שאם נתמקד בדברים הקטנים נגלה דברים גדולים. איך תעשי את זה? תתחברי לעצמך על ידי שקט פנימי</p>
+            <button dir="rtl" class="close-button" onclick="closeModal()">רוצה לשחק שוב?</button>
+        </div>
+    </div>
+    
+    <script>
+        let foundCount = 0;
+        const totalDifferences = 3;
+        
+        // Function to mark a difference as found
+        function markAsFound(element) {
+            if (!element.classList.contains('found')) {
+                element.classList.add('found');
+                foundCount++;
+                document.getElementById('found-count').textContent = foundCount;
+                
+                // Check if all differences are found
+                if (foundCount === totalDifferences) {
+                    setTimeout(() => {
+                        document.getElementById('completion-modal').style.display = 'flex';
+                    }, 500);
+                }
+            }
+        }
+        
+        // Function to close the modal and reset the game
+        function closeModal() {
+            document.getElementById('completion-modal').style.display = 'none';
+            resetGame();
+        }
+        
+        // Function to reset the game
+        function resetGame() {
+            foundCount = 0;
+            document.getElementById('found-count').textContent = foundCount;
+            
+            // Reset all difference areas
+            const differenceAreas = document.querySelectorAll('.difference-area');
+            differenceAreas.forEach(area => {
+                area.classList.remove('found');
+            });
+        }
+        
+        // Position the difference areas with fixed coordinates
+        function positionDifferenceAreas() {
+            const image = document.getElementById('modified-image');
+            const diff1 = document.getElementById('diff1');
+            const diff2 = document.getElementById('diff2');
+            const diff3 = document.getElementById('diff3');
+            
+            // Wait for image to load to get proper dimensions
+            image.onload = function() {
+                // Specify coordinates in pixels for each difference
+                // Example positions - you'll need to adjust these based on your actual differences
+                setDifferencePosition(diff1, 139, 50, 40, 40);  // x, y, width, height
+                setDifferencePosition(diff2, 86, 180, 40, 40);
+                setDifferencePosition(diff3, 300, 250, 40, 40);
+            };
+            
+            // If image is already loaded
+            if (image.complete) {
+                image.onload();
+            }
+        }
+        
+        // Helper function to set position
+        function setDifferencePosition(element, x, y, width, height) {
+            element.style.left = x + 'px';
+            element.style.top = y + 'px';
+            element.style.width = width + 'px';
+            element.style.height = height + 'px';
+        }
+        
+        // Initialize the game when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            positionDifferenceAreas();
+        });
+    </script>
+</body>
+</html>
